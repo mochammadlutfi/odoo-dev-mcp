@@ -11,6 +11,8 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from . import module_cache
+
 
 def _parse_manifest(module_path: Path) -> dict[str, Any] | None:
     """Parse __manifest__.py as a literal Python dict via AST (no code exec)."""
@@ -77,35 +79,45 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def analyze_odoo_module(module_path: str) -> str:
-        """Summarize a single Odoo module: manifest + model files + view files."""
+        """Summarize a single Odoo module: manifest + model files + view files.
+
+        Results are cached by recursive mtime signature; repeated calls on an
+        unchanged module return instantly.
+        """
         path = Path(module_path).expanduser()
-        manifest = _parse_manifest(path)
-        if manifest is None:
-            return f"Error: no valid __manifest__.py in {module_path}"
+        if not path.is_dir():
+            return f"Error: not a directory: {module_path}"
+        return module_cache.get_or_compute(path, _build_module_summary)
 
-        models_dir = path / "models"
-        model_files = sorted(models_dir.glob("*.py")) if models_dir.is_dir() else []
-        model_attrs: list[str] = []
-        for py in model_files:
-            if py.name == "__init__.py":
-                continue
-            model_attrs.extend(_extract_model_attrs(py))
 
-        views_dir = path / "views"
-        view_files = sorted(p.name for p in views_dir.glob("*.xml")) if views_dir.is_dir() else []
+def _build_module_summary(path: Path) -> str:
+    manifest = _parse_manifest(path)
+    if manifest is None:
+        return f"Error: no valid __manifest__.py in {path}"
 
-        out = [
-            f"# Module: {path.name}",
-            f"- Display: {manifest.get('name', '?')}",
-            f"- Version: {manifest.get('version', '?')}",
-            f"- Category: {manifest.get('category', '?')}",
-            f"- Depends: {manifest.get('depends', [])}",
-            f"- Data entries: {len(manifest.get('data', []))}",
-            "",
-            f"## Models ({len(model_files)} files, {len(model_attrs)} declarations)",
-            *([f"- {a}" for a in model_attrs] or ["_none detected_"]),
-            "",
-            f"## Views ({len(view_files)} files)",
-            *([f"- {f}" for f in view_files] or ["_none_"]),
-        ]
-        return "\n".join(out)
+    models_dir = path / "models"
+    model_files = sorted(models_dir.glob("*.py")) if models_dir.is_dir() else []
+    model_attrs: list[str] = []
+    for py in model_files:
+        if py.name == "__init__.py":
+            continue
+        model_attrs.extend(_extract_model_attrs(py))
+
+    views_dir = path / "views"
+    view_files = sorted(p.name for p in views_dir.glob("*.xml")) if views_dir.is_dir() else []
+
+    out = [
+        f"# Module: {path.name}",
+        f"- Display: {manifest.get('name', '?')}",
+        f"- Version: {manifest.get('version', '?')}",
+        f"- Category: {manifest.get('category', '?')}",
+        f"- Depends: {manifest.get('depends', [])}",
+        f"- Data entries: {len(manifest.get('data', []))}",
+        "",
+        f"## Models ({len(model_files)} files, {len(model_attrs)} declarations)",
+        *([f"- {a}" for a in model_attrs] or ["_none detected_"]),
+        "",
+        f"## Views ({len(view_files)} files)",
+        *([f"- {f}" for f in view_files] or ["_none_"]),
+    ]
+    return "\n".join(out)

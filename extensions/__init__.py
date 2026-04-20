@@ -7,9 +7,10 @@ from mcp.server.fastmcp import FastMCP
 
 
 def register_all(mcp: FastMCP) -> None:
-    from . import doc_index, introspection, scaffolding, validators
+    from . import doc_index, introspection, module_cache, scaffolding, validators
 
     introspection.register(mcp)
     scaffolding.register(mcp)
     validators.register(mcp)
     doc_index.register(mcp)
+    module_cache.register(mcp)
