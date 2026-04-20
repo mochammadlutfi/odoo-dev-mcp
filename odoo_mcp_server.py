@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any
+import html
 import re
 from mcp.server.fastmcp import FastMCP, Context
 
@@ -227,17 +228,15 @@ def create_odoo_module(
     depends = depends or ["base"]
     
     manifest_content = f'''{{
-    'name': '{display_name}',
+    'name': {display_name!r},
     'version': '{version}.1.0.0',
-    'category': '{category}',
-    'summary': '{description}',
-    'description': """
-        {description}
-    """,
-    'author': '{author}',
+    'category': {category!r},
+    'summary': {description!r},
+    'description': {description!r},
+    'author': {author!r},
     'website': 'https://www.yourcompany.com',
     'license': 'LGPL-3',
-    'depends': {depends},
+    'depends': {depends!r},
     'data': [
         'security/ir.model.access.csv',
     ],
@@ -334,19 +333,19 @@ def create_odoo_model(
         
         if field_type == "Many2one":
             comodel = field.get("comodel_name", "res.partner")
-            field_def = f'    {field_name} = fields.Many2one(\'{comodel}\', string=\'{field_string}\', required={required})'
+            field_def = f'    {field_name} = fields.Many2one(\'{comodel}\', string={field_string!r}, required={required})'
         elif field_type == "One2many":
             comodel = field.get("comodel_name")
             inverse = field.get("inverse_name")
-            field_def = f'    {field_name} = fields.One2many(\'{comodel}\', \'{inverse}\', string=\'{field_string}\')'
+            field_def = f'    {field_name} = fields.One2many(\'{comodel}\', \'{inverse}\', string={field_string!r})'
         elif field_type == "Many2many":
             comodel = field.get("comodel_name")
-            field_def = f'    {field_name} = fields.Many2many(\'{comodel}\', string=\'{field_string}\')'
+            field_def = f'    {field_name} = fields.Many2many(\'{comodel}\', string={field_string!r})'
         elif field_type == "Selection":
             selection = field.get("selection", "[('draft', 'Draft'), ('done', 'Done')]")
-            field_def = f'    {field_name} = fields.Selection({selection}, string=\'{field_string}\', required={required})'
+            field_def = f'    {field_name} = fields.Selection({selection}, string={field_string!r}, required={required})'
         else:
-            field_def = f'    {field_name} = fields.{field_type}(string=\'{field_string}\', required={required})'
+            field_def = f'    {field_name} = fields.{field_type}(string={field_string!r}, required={required})'
         
         field_definitions.append(field_def)
     
@@ -368,7 +367,7 @@ class {class_name}(models.Model):
 
 class {class_name}(models.Model):
     _name = '{model_name}'
-    _description = '{model_description}'
+    _description = {model_description!r}
 
     name = fields.Char(string='Name', required=True)
 {fields_code}
@@ -417,31 +416,33 @@ def create_odoo_view(
     version = current_version["value"]
     if not view_name:
         view_name = f"{model_name.replace('.', '_')}_{view_type}_view"
-    
+
     model_underscore = model_name.replace(".", "_")
-    
+    model_name_x = html.escape(model_name, quote=True)
+    view_name_x = html.escape(view_name, quote=True)
+
     if view_type in ("tree", "list"):
-        fields_xml = "\n            ".join([f'<field name="{field}"/>' for field in fields_to_display])
+        fields_xml = "\n            ".join([f'<field name="{html.escape(f, quote=True)}"/>' for f in fields_to_display])
         view_xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="{view_name}" model="ir.ui.view">
-        <field name="name">{model_name}.tree</field>
-        <field name="model">{model_name}</field>
+    <record id="{view_name_x}" model="ir.ui.view">
+        <field name="name">{model_name_x}.tree</field>
+        <field name="model">{model_name_x}</field>
         <field name="arch" type="xml">
             <{"list" if version in ("17.0", "18.0", "19.0") else "tree"}>
                 {fields_xml}
-            </{"/list" if version in ("17.0", "18.0", "19.0") else "/tree"}>
+            </{"list" if version in ("17.0", "18.0", "19.0") else "tree"}>
         </field>
     </record>
 </odoo>'''
-    
+
     elif view_type == "form":
-        fields_xml = "\n                    ".join([f'<field name="{field}"/>' for field in fields_to_display])
+        fields_xml = "\n                    ".join([f'<field name="{html.escape(f, quote=True)}"/>' for f in fields_to_display])
         view_xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="{view_name}" model="ir.ui.view">
-        <field name="name">{model_name}.form</field>
-        <field name="model">{model_name}</field>
+    <record id="{view_name_x}" model="ir.ui.view">
+        <field name="name">{model_name_x}.form</field>
+        <field name="model">{model_name_x}</field>
         <field name="arch" type="xml">
             <form>
                 <sheet>
@@ -453,14 +454,14 @@ def create_odoo_view(
         </field>
     </record>
 </odoo>'''
-    
+
     elif view_type == "search":
-        fields_xml = "\n                ".join([f'<field name="{field}"/>' for field in fields_to_display])
+        fields_xml = "\n                ".join([f'<field name="{html.escape(f, quote=True)}"/>' for f in fields_to_display])
         view_xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="{view_name}" model="ir.ui.view">
-        <field name="name">{model_name}.search</field>
-        <field name="model">{model_name}</field>
+    <record id="{view_name_x}" model="ir.ui.view">
+        <field name="name">{model_name_x}.search</field>
+        <field name="model">{model_name_x}</field>
         <field name="arch" type="xml">
             <search>
                 {fields_xml}
@@ -468,13 +469,13 @@ def create_odoo_view(
         </field>
     </record>
 </odoo>'''
-    
+
     elif view_type == "kanban":
         view_xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="{view_name}" model="ir.ui.view">
-        <field name="name">{model_name}.kanban</field>
-        <field name="model">{model_name}</field>
+    <record id="{view_name_x}" model="ir.ui.view">
+        <field name="name">{model_name_x}.kanban</field>
+        <field name="model">{model_name_x}</field>
         <field name="arch" type="xml">
             <kanban>
                 <field name="name"/>
@@ -491,18 +492,19 @@ def create_odoo_view(
         </field>
     </record>
 </odoo>'''
-    
+
     else:
         return f"Unsupported view type: {view_type}. Supported types: tree, form, search, kanban"
-    
+
+    model_name_title = html.escape(model_name.split('.')[-1].title(), quote=True)
     action_xml = f'''    <record id="action_{model_underscore}" model="ir.actions.act_window">
-        <field name="name">{model_name.split('.')[-1].title()}</field>
-        <field name="res_model">{model_name}</field>
+        <field name="name">{model_name_title}</field>
+        <field name="res_model">{model_name_x}</field>
         <field name="view_mode">{"list" if version in ("17.0", "18.0", "19.0") else "tree"},form</field>
     </record>
 
     <menuitem id="menu_{model_underscore}"
-              name="{model_name.split('.')[-1].title()}"
+              name="{model_name_title}"
               action="action_{model_underscore}"
               parent="base.menu_custom"/>'''
     
@@ -561,7 +563,12 @@ def create_security_rules(
     groups: list[str] | None = None,
 ) -> str:
     groups = groups or ["user", "manager"]
-    
+
+    for _csv_val, _csv_label in [(model_name, "model_name"), (module_name, "module_name")]:
+        if "," in _csv_val or "\n" in _csv_val:
+            return f"Error: {_csv_label} must not contain commas or newlines"
+
+
     model_underscore = model_name.replace(".", "_")
     
     csv_lines = ["id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink"]
