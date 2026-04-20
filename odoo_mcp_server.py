@@ -421,7 +421,7 @@ def create_odoo_view(
     
     model_underscore = model_name.replace(".", "_")
     
-    if view_type == "tree":
+    if view_type in ("tree", "list"):
         fields_xml = "\n            ".join([f'<field name="{field}"/>' for field in fields_to_display])
         view_xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <odoo>
@@ -429,9 +429,9 @@ def create_odoo_view(
         <field name="name">{model_name}.tree</field>
         <field name="model">{model_name}</field>
         <field name="arch" type="xml">
-            <tree>
+            <{"list" if version in ("17.0", "18.0", "19.0") else "tree"}>
                 {fields_xml}
-            </tree>
+            </{"/list" if version in ("17.0", "18.0", "19.0") else "/tree"}>
         </field>
     </record>
 </odoo>'''
@@ -499,7 +499,7 @@ def create_odoo_view(
     action_xml = f'''    <record id="action_{model_underscore}" model="ir.actions.act_window">
         <field name="name">{model_name.split('.')[-1].title()}</field>
         <field name="res_model">{model_name}</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">{"list" if version in ("17.0", "18.0", "19.0") else "tree"},form</field>
     </record>
 
     <menuitem id="menu_{model_underscore}"
@@ -510,7 +510,8 @@ def create_odoo_view(
     doc_reference = f"odoo://docs/{version}/reference/user_interface/view_architectures"
     rules_reference = "odoo://rules/odoo-development"
     
-    return f"""# {view_type.title()} View for {model_name} (Odoo {version})
+    view_label = "List" if view_type in ("tree", "list") and version in ("17.0", "18.0", "19.0") else ("Tree" if view_type in ("tree", "list") else view_type.title())
+    return f"""# {view_label} View for {model_name} (Odoo {version})
 
 **File**: views/{model_underscore}_views.xml
 
