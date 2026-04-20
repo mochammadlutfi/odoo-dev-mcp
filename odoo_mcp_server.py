@@ -221,11 +221,10 @@ def create_odoo_module(
     description: str,
     author: str = "Your Company",
     category: str = "Uncategorized",
-    depends: list[str] = []
+    depends: list[str] | None = None,
 ) -> str:
     version = current_version["value"]
-    if not depends:
-        depends = ["base"]
+    depends = depends or ["base"]
     
     manifest_content = f'''{{
     'name': '{display_name}',
@@ -559,10 +558,9 @@ Add to __manifest__.py 'data' section:
 def create_security_rules(
     model_name: str,
     module_name: str,
-    groups: list[str] = []
+    groups: list[str] | None = None,
 ) -> str:
-    if not groups:
-        groups = ["user", "manager"]
+    groups = groups or ["user", "manager"]
     
     model_underscore = model_name.replace(".", "_")
     
