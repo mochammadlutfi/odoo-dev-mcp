@@ -38,6 +38,15 @@ def _mtime_signature(module_path: Path) -> float:
     return latest
 
 
+def _jsonable(value: Any) -> Any:
+    """Recursively convert sets/tuples to lists so the result is JSON-safe."""
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_jsonable(v) for v in value]
+    return value
+
+
 def _load_cache() -> dict[str, dict[str, Any]]:
     if not CACHE_FILE.exists():
         return {}
@@ -66,7 +75,7 @@ def get_or_compute(module_path: Path, builder) -> Any:
     if entry and entry.get("sig") == sig:
         return entry["value"]
     value = builder(module_path)
-    cache[key] = {"sig": sig, "value": value}
+    cache[key] = {"sig": sig, "value": _jsonable(value)}
     _save_cache(cache)
     return value
 
